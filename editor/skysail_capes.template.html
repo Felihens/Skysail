@@ -1,0 +1,902 @@
+<title>Skysail Capes</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Same loft as the wingsuit editor: 3D stage on the left, a tool rail on the right (under the stage on phones). */
+:root {
+  --bg: #e4e8eb; --panel: #f3f5f6; --ink: #1c2227; --muted: #5a6670; --line: #cdd5db;
+  --accent: #3e4f7a; --accent-ink: #f4f6ff; --stage: #c6d1d9; --field: #ffffff;
+  --display: "Barlow Condensed", "Arial Narrow", sans-serif; --body: "Inter", system-ui, sans-serif; --mono: "JetBrains Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #121519; --panel: #191d22; --ink: #e2e7eb; --muted: #95a2ac; --line: #2c343a;
+  --accent: #9fb3ea; --accent-ink: #10131c; --stage: #1d242b; --field: #10151a; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #121519; --panel: #191d22; --ink: #e2e7eb; --muted: #95a2ac; --line: #2c343a;
+  --accent: #9fb3ea; --accent-ink: #10131c; --stage: #1d242b; --field: #10151a; color-scheme: dark }
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 14px; }
+.app { height: 100%; display: flex; min-height: 0; }
+.stage { flex: 1; min-width: 0; position: relative; background: var(--stage); }
+.stage canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.hint { position: absolute; left: max(12px, env(safe-area-inset-left, 0px)); bottom: 10px; right: 12px; font-size: 12px; color: var(--muted); pointer-events: none; line-height: 1.4; }
+.badge { position: absolute; top: 10px; left: max(12px, env(safe-area-inset-left, 0px)); font-family: var(--mono); font-size: 11px; color: var(--muted); background: var(--panel); border: 1px solid var(--line); border-radius: 5px; padding: 3px 7px; }
+.views { position: absolute; top: 10px; right: max(12px, env(safe-area-inset-right, 0px)); display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+.views button { padding: 4px 8px; font-size: 12px; }
+#capeSel { width: 100%; font: inherit; color: var(--ink); background: var(--field); border: 1px solid var(--line); border-radius: 6px; padding: 7px 8px; }
+.rail { width: 340px; flex: none; background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto;
+  padding-block: 18px; padding-left: 18px; padding-right: max(18px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 18px; }
+h1 { font-family: var(--display); font-weight: 700; font-size: 28px; margin: 0; letter-spacing: .03em; text-transform: uppercase; line-height: 1; }
+.sub { color: var(--muted); margin: 6px 0 0; line-height: 1.45; }
+h2 { font-family: var(--display); font-size: 15px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin: 0 0 8px; font-weight: 600; }
+.row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+button { font: inherit; cursor: pointer; border-radius: 6px; border: 1px solid var(--line); background: var(--field); color: var(--ink); padding: 6px 10px; }
+button:hover { border-color: var(--accent); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+button:disabled { opacity: .5; cursor: default; }
+.grid2 { display: grid; grid-template-columns: auto 1fr auto; gap: 8px 10px; align-items: center; }
+.grid2 label { color: var(--muted); }
+.grid2 output { font-family: var(--mono); font-size: 12px; min-width: 52px; text-align: right; font-variant-numeric: tabular-nums; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+.tierRow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.tierRow button { padding: 5px 6px; font-size: 12px; text-align: left; }
+.anchors { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+.anchors button { display: flex; align-items: center; gap: 6px; text-align: left; font-size: 13px; }
+.dot { width: 10px; height: 10px; border-radius: 50%; flex: none; display: inline-block; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 10px; font-size: 12px; color: var(--muted); }
+.legend span { display: flex; align-items: center; gap: 5px; }
+[hidden] { display: none !important; }
+.note { font-size: 12px; color: var(--muted); line-height: 1.45; margin: 6px 0 0; }
+.status { font-family: var(--mono); font-size: 12px; color: var(--muted); min-height: 1.4em; }
+@media (max-width: 760px) {
+  .app { flex-direction: column; }
+  .stage { flex: none; height: 56%; }
+  .rail { width: auto; border-left: none; border-top: 1px solid var(--line); flex: 1; }
+}
+</style>
+
+<div class="app">
+  <div class="stage" id="stage">
+    <div class="badge" id="badge">carregando…</div>
+    <div class="views">
+      <button id="vBack">Atrás</button><button id="vSide">Lado</button><button id="vTop">Cima</button><button id="vFront">Frente</button>
+      <button id="openBtn" aria-pressed="true">Caindo / em pé</button>
+    </div>
+    <div class="hint">Arraste para girar a câmera, role ou pinça para zoom. A capa é simulada como tecido: o vento vem da frente e de baixo, como numa queda planando.</div>
+  </div>
+  <aside class="rail">
+    <div>
+      <h1>Skysail Capes</h1>
+      <p class="sub">A pose de queda do próprio jogo (1 s depois de começar a cair), o corpo inclinado e a capa presa só no alto das costas, como o jogo veste; o resto balança no vento da queda.</p>
+    </div>
+
+    <div>
+      <h2>Capa</h2>
+      <div style="margin-bottom:10px"><select id="capeSel" aria-label="Qual capa editar"></select>
+        <p class="note" id="capeNote" style="margin:6px 0 0">Cada capa tem os próprios pontos. Troque aqui, prenda, salve; as outras ficam guardadas.</p></div>
+      <div class="grid2">
+        <label for="tilt">Inclinação do corpo</label><input id="tilt" type="range" min="0" max="100" step="1"><output id="tiltOut"></output>
+        <label for="top">Presa até</label><input id="top" type="range" min="0.02" max="0.5" step="0.01"><output id="topOut"></output>
+      </div>
+      <p class="note" id="fallNote">Inclinação: 0° em pé, 90° deitado (no mod é BodyTilt). Presa até: quanto da capa, a partir dos ombros, acompanha o corpo sem balançar.</p>
+      <div class="grid2" hidden>
+        <label for="bottom">Largura na barra</label><input id="bottom" type="range" min="0.2" max="1.2" step="0.01"><output id="bottomOut"></output>
+        <label for="length">Comprimento</label><input id="length" type="range" min="0.6" max="1.4" step="0.01"><output id="lengthOut"></output>
+        <label for="slack">Folga do tecido</label><input id="slack" type="range" min="1" max="1.35" step="0.01"><output id="slackOut"></output>
+      </div>
+
+    </div>
+
+    <div hidden>
+      <h2>Pontos de fixação</h2>
+      <div class="row">
+        <button id="editPins" aria-pressed="false">Editar pontos</button>
+        <label style="display:flex;gap:6px;align-items:center;color:var(--muted)"><input type="checkbox" id="mirror" checked> Espelhar no outro lado</label>
+      </div>
+      <div id="pinTools" hidden style="margin-top:10px">
+        <p class="note" id="pinSel" style="margin:0 0 8px">Toque num ponto da capa.</p>
+        <div class="anchors" id="anchors"></div>
+        <div class="row" style="margin-top:8px">
+          <button id="pinsDefault">Pontos padrão</button>
+          <button id="pinsClear">Soltar todos dos braços</button>
+        </div>
+      </div>
+      <div class="legend" id="legend"></div>
+      <p class="note">No jogo a capa só se prende nos ombros. Aqui você escolhe quais pontos dela vão para os ombros, cotovelos e pulsos. Ao editar, a capa aparece parada no formato normal do jogo, com o personagem em pé.</p>
+    </div>
+
+    <div>
+      <h2>Voo</h2>
+      <div class="grid2">
+        <label for="fwd">Para frente</label><input id="fwd" type="range" min="0" max="25" step="0.5"><output id="fwdOut"></output>
+        <label for="fall">Queda</label><input id="fall" type="range" min="0" max="5" step="0.1"><output id="fallOut"></output>
+        <label for="lift">Vento por baixo</label><input id="lift" type="range" min="0" max="3" step="0.05"><output id="liftOut"></output>
+        <label for="trail">Puxar pra trás</label><input id="trail" type="range" min="0" max="3" step="0.05"><output id="trailOut"></output>
+        <label for="wind">Força do vento</label><input id="wind" type="range" min="0" max="2" step="0.05"><output id="windOut"></output>
+        <label for="gust">Ondulação</label><input id="gust" type="range" min="0" max="1" step="0.05"><output id="gustOut"></output>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button id="resetSim">Soltar de novo</button>
+      </div>
+      <div class="tierRow" id="tierRow" style="margin-top:8px"></div>
+      <div class="row" style="margin-top:8px">
+        <button id="dive" aria-pressed="false">Mergulhar (W)</button><button id="brake" aria-pressed="false">Frear (S)</button>
+        <button id="moving" aria-pressed="true">Chão passando</button>
+      </div>
+      <p class="note">Vento por baixo segura a capa no ar e faz ela estufar; puxar pra trás estica ela atrás de você como uma bandeira; ondulação são as ondas que correm do braço até a barra. Os tiers usam as velocidades do mod. Mergulhar e frear fazem o mesmo que segurar W ou S no jogo. O chão e os fiapos de vento passam na velocidade do voo. No jogo quem mexe a capa é a física de tecido do próprio Valheim, então aqui é uma prévia aproximada.</p>
+    </div>
+
+    <div>
+      <h2>Salvar</h2>
+      <div class="row">
+        <button class="primary" id="save">Salvar para o mod</button>
+        <button id="defaults">Voltar ao padrão</button>
+      </div>
+      <p class="status" id="status"></p>
+    </div>
+  </aside>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script id="player" type="application/json">__PLAYER__</script>
+<script id="pose" type="application/json">__POSE__</script>
+<script id="fallpose" type="application/json">__FALL__</script>
+<script>
+"use strict";
+// Unity (left-handed) → three.js: position (x,y,z) → (-x,y,z), quaternion (x,y,z,w) → (x,-y,-z,w), winding reversed.
+const PLAYER = JSON.parse(document.getElementById("player").textContent || "null");
+const POSE = JSON.parse(document.getElementById("pose").textContent || "{}");
+const FALL = JSON.parse(document.getElementById("fallpose").textContent || "null");   // the skeleton 1 s into the game's fall
+const $ = id => document.getElementById(id);
+const V3 = THREE.Vector3, Q = THREE.Quaternion, M4 = THREE.Matrix4;
+const ONE = new V3(1, 1, 1), DEG = Math.PI / 180;
+const qU = q => new Q(q[0], -q[1], -q[2], q[3]);
+const r3 = n => Math.round(n * 1000) / 1000;
+function unityEuler(x, y, z) {
+  const qx = new Q().setFromAxisAngle(new V3(1, 0, 0), x * DEG);
+  const qy = new Q().setFromAxisAngle(new V3(0, 1, 0), y * DEG);
+  const qz = new Q().setFromAxisAngle(new V3(0, 0, 1), z * DEG);
+  const u = qy.multiply(qx).multiply(qz);
+  return new Q(u.x, -u.y, -u.z, u.w);
+}
+
+const DEFAULTS = { tilt: 60, top: 0.12, bottom: 0.6, length: 1, slack: 1.08, fwd: 15, fall: 2, wind: 0.5, gust: 0.5, lift: 1, trail: 1 };
+const state = Object.assign({ open: 1, dive: false, brake: false, moving: true }, DEFAULTS);
+
+// ---------------------------------------------------------------- scene
+const stage = $("stage");
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+renderer.outputEncoding = THREE.sRGBEncoding;
+stage.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(40, 1, 0.05, 200);
+const orbit = new THREE.OrbitControls(camera, renderer.domElement);
+orbit.enableDamping = true;
+scene.add(new THREE.HemisphereLight(0xe4ecf4, 0x4a4036, 0.9));
+const sun = new THREE.DirectionalLight(0xffffff, 0.85); sun.position.set(2, 6, 3); scene.add(sun);
+// the ground far below, a meadow with a grid so the speed shows; it scrolls under you while you fly
+const groundCanvas = document.createElement("canvas"); groundCanvas.width = groundCanvas.height = 256;
+{
+  const g = groundCanvas.getContext("2d");
+  g.fillStyle = "#7d8a6a"; g.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 900; i++) { g.fillStyle = Math.random() < 0.5 ? "#71805f" : "#8a9673"; g.fillRect(Math.random() * 256, Math.random() * 256, 3 + Math.random() * 6, 3 + Math.random() * 6); }
+  g.strokeStyle = "rgba(40,50,30,0.35)"; g.lineWidth = 3; g.strokeRect(0, 0, 256, 256);
+}
+const groundTex = new THREE.CanvasTexture(groundCanvas);
+groundTex.wrapS = groundTex.wrapT = THREE.RepeatWrapping; groundTex.repeat.set(40, 40); groundTex.encoding = THREE.sRGBEncoding;
+const GROUND_Y = -6;
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshStandardMaterial({ map: groundTex, roughness: 1 }));
+ground.rotation.x = -Math.PI / 2; ground.position.y = GROUND_Y; scene.add(ground);
+scene.fog = new THREE.Fog(0xc6d1d9, 30, 140);
+// trees passing by
+const trees = [];
+{
+  const trunkM = new THREE.MeshStandardMaterial({ color: 0x5a4632 }), leafM = new THREE.MeshStandardMaterial({ color: 0x3f5a35, roughness: 1 });
+  for (let i = 0; i < 40; i++) {
+    const t = new THREE.Group();
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.2, 2, 6), trunkM); trunk.position.y = 1;
+    const leaf = new THREE.Mesh(new THREE.ConeGeometry(1.2, 3.5, 7), leafM); leaf.position.y = 3.3;
+    t.add(trunk, leaf);
+    t.position.set((Math.random() - 0.5) * 60, GROUND_Y, (Math.random() - 0.5) * 160);
+    if (Math.abs(t.position.x) < 4) t.position.x += 8 * Math.sign(t.position.x || 1);
+    scene.add(t); trees.push(t);
+  }
+}
+// wind streaks: specks of air drifting past, so you see where the wind comes from and how fast
+const STREAKS = 260, streakPos = new Float32Array(STREAKS * 6);
+const streaks = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.45 }));
+streaks.geometry.setAttribute("position", new THREE.BufferAttribute(streakPos, 3));
+scene.add(streaks);
+const specks = [];
+for (let i = 0; i < STREAKS; i++) specks.push(new V3((Math.random() - 0.5) * 8, Math.random() * 5 - 1.5, (Math.random() - 0.5) * 16));
+function moveWorld(dt, vel) {
+  // vel = how the player moves through the world; everything else drifts the other way
+  if (!state.moving) vel = new V3();
+  groundTex.offset.y += vel.z * dt / 10;
+  trees.forEach(t => { t.position.z -= vel.z * dt; if (t.position.z < -80) t.position.z += 160; });
+  const air = vel.clone().negate();
+  const p = streaks.geometry.attributes.position;
+  specks.forEach((s, i) => {
+    s.addScaledVector(air, dt);
+    if (s.z < -8) s.z += 16; if (s.z > 8) s.z -= 16;
+    if (s.y > 3.5) s.y -= 5; if (s.y < -1.5) s.y += 5;
+    const tail = s.clone().addScaledVector(air, -0.06);
+    p.setXYZ(i * 2, s.x, s.y, s.z); p.setXYZ(i * 2 + 1, tail.x, tail.y, tail.z);
+  });
+  p.needsUpdate = true;
+  streaks.visible = vel.lengthSq() > 0.01;
+}
+function view(k) {
+  orbit.target.set(0, 1.0, 0);
+  if (k === "back") camera.position.set(0, 2.4, -3.4);
+  else if (k === "side") camera.position.set(3.8, 1.3, 0.2);
+  else if (k === "front") camera.position.set(0, 1.0, 3.6);
+  else camera.position.set(0.01, 4.6, 0.3);
+}
+view("back");
+$("vBack").onclick = () => view("back"); $("vSide").onclick = () => view("side"); $("vTop").onclick = () => view("top"); $("vFront").onclick = () => view("front");
+function resize() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / Math.max(1, h); camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(stage);
+
+// ---------------------------------------------------------------- skeleton and body (same as the wingsuit editor)
+const bones = [], byName = {}, parts = [];
+let capeSrc = null;
+const isSheet = pt => pt.cloth === undefined ? /_cloth$/i.test(pt.name) : !!pt.cloth;   // the cape part simulated as cloth
+const skey = pt => pt.name + "#" + (pt.v.length / 3);   // pins belong to one mesh: its name and vertex count
+// the export lists every shoulder item: drop the ones that aren't capes, merge capes that share one sheet
+// (same mesh, same points) and put them in the order you get them in the game
+function prepCapes() {
+  if (!PLAYER || !PLAYER.capes) return;
+  const order = ["CapeDeerHide", "CapeTrollHide", "CapeWolf", "CapeLinen", "CapeLox", "CapeFeather", "CapeAsksvin", "CapeAsh", "CapeDeepNorth", "CapeDeepNorthMage", "CapeOdin"];
+  const list = [];
+  PLAYER.capes.forEach(c => {
+    if (/^(CapeTest|GoblinBrute_)/.test(c.item) || !c.parts.length) return;
+    // a *_cloth part wins (the wolf cape: its fur is the bigger mesh), then the one the game simulates
+    const sheet = c.parts.find(q => /_cloth$/i.test(q.name)) || c.parts.find(q => q.cloth) || c.parts[0];
+    c.parts.forEach(q => q.cloth = q === sheet);
+    c.key = skey(sheet);
+    const same = list.find(x => x.key === c.key);
+    if (same) { if (same.label !== c.label && !same.also.includes(c.label)) same.also.push(c.label); same.items.push(c.item); return; }
+    c.also = []; c.items = [c.item]; list.push(c);
+  });
+  const rank = c => { const i = order.indexOf(c.item); return i < 0 ? 100 : i; };
+  list.sort((a, b) => rank(a) - rank(b));
+  PLAYER.capes = list;
+}
+function buildPlayer() {
+  PLAYER.bones.forEach((b, i) => {
+    const pos = new V3(-b.pos[0], b.pos[1], b.pos[2]), rot = qU(b.rot);
+    const restW = new M4().compose(pos, rot, ONE);
+    const o = { n: b.n, p: b.p, restW, restWInv: restW.clone().invert(), lpos: new V3(), lrot: new Q(), rest: {},
+      wpos: new V3(), wrot: new Q(), W: new M4(), skin: new M4(), off: (POSE.offsets && POSE.offsets[b.n]) || [0, 0, 0] };
+    bones.push(o); byName[b.n] = i;
+  });
+  bones.forEach(b => {
+    const local = b.p < 0 ? b.restW.clone() : new M4().multiplyMatrices(bones[b.p].restWInv, b.restW);
+    local.decompose(b.lpos, b.lrot, new V3());
+    b.rest.lpos = b.lpos.clone(); b.rest.lrot = b.lrot.clone();
+  });
+  // the fall pose: the same bones, posed by the game's fall animation (world in the player's frame -> local)
+  if (FALL && FALL.bones) {
+    const fw = {};
+    FALL.bones.forEach(f => { fw[f.n] = new M4().compose(new V3(-f.pos[0], f.pos[1], f.pos[2]), qU(f.rot), ONE); });
+    let found = 0;
+    bones.forEach(b => {
+      const W = fw[b.n]; if (!W) return;
+      const P = b.p < 0 ? null : fw[bones[b.p].n];
+      if (b.p >= 0 && !P) return;
+      const local = b.p < 0 ? W.clone() : new M4().multiplyMatrices(P.clone().invert(), W);
+      const lp = new V3(), lr = new Q(); local.decompose(lp, lr, new V3());
+      b.fall = { lpos: lp, lrot: lr }; found++;
+    });
+    FALL.found = found;
+  }
+  const capeNames = new Set();
+  (PLAYER.capes || []).forEach(c => c.parts.forEach(q => capeNames.add(q.name)));
+  PLAYER.parts.forEach(pt => {
+    if (isSheet(pt)) { if (!PLAYER.capes || !PLAYER.capes.length) capeSrc = pt; return; }   // the cape sheet is simulated below
+    if (capeNames.has(pt.name)) return;   // the cape worn at export: the cape list below has it
+    addPart(pt, null);
+  });
+}
+function addPart(pt, list) {
+    const n = pt.v.length / 3, rest = new Float32Array(pt.v.length);
+    for (let i = 0; i < n; i++) { rest[i * 3] = -pt.v[i * 3]; rest[i * 3 + 1] = pt.v[i * 3 + 1]; rest[i * 3 + 2] = pt.v[i * 3 + 2]; }
+    const idx = [];
+    for (let i = 0; i < pt.t.length; i += 3) idx.push(pt.t[i], pt.t[i + 2], pt.t[i + 1]);
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(rest.slice(), 3));
+    if (pt.uv && pt.uv.length === n * 2) g.setAttribute("uv", new THREE.BufferAttribute(new Float32Array(pt.uv), 2));
+    g.setIndex(idx);
+    const mat = new THREE.MeshStandardMaterial({ color: 0xcfc4b5, roughness: 0.85, side: THREE.DoubleSide });
+    if (pt.col) mat.color.setRGB(pt.col[0], pt.col[1], pt.col[2]);
+    if (pt.tex) { const tex = new THREE.TextureLoader().load("data:image/png;base64," + pt.tex); tex.encoding = THREE.sRGBEncoding; mat.map = tex; }
+    const mesh = new THREE.Mesh(g, mat);
+    scene.add(mesh);
+    const rec = { mesh, rest, bone: pt.b || [] };
+    parts.push(rec);
+    if (list) list.push(rec);
+    return rec;
+}
+function fk() {
+  bones.forEach(b => {
+    const local = new M4().compose(b.lpos, b.lrot, ONE);
+    if (b.p < 0) b.W.copy(local); else b.W.multiplyMatrices(bones[b.p].W, local);
+    b.W.decompose(b.wpos, b.wrot, new V3());
+  });
+}
+function setWorldRot(b, q) {
+  const parentRot = b.p < 0 ? new Q() : bones[b.p].wrot.clone();
+  b.lrot.copy(parentRot.invert().multiply(q));
+}
+function bone(n) { const i = byName[n]; return i === undefined ? null : bones[i]; }
+function P(n) { const b = bone(n); return b ? b.wpos.clone() : new V3(); }
+let tiltQ = new Q();
+function body(tilt, x, y, z) { return new V3(-x, y, z).normalize().applyQuaternion(tilt); }
+function swing(an, bn, dir, w) {
+  const a = bone(an), b = bone(bn);
+  if (!a || !b) return;
+  const cur = b.wpos.clone().sub(a.wpos);
+  if (cur.lengthSq() < 1e-8) return;
+  const q = new Q().setFromUnitVectors(cur.normalize(), dir);
+  setWorldRot(a, new Q().slerp(q, w).multiply(a.wrot));
+  fk();
+}
+// the glide pose, as the mod does it: the game's fall pose, then the body leans forward from the hips
+function pose(w) {
+  bones.forEach(b => {
+    b.lpos.copy(b.rest.lpos); b.lrot.copy(b.rest.lrot);
+    if (b.fall) { b.lpos.lerp(b.fall.lpos, w); b.lrot.slerp(b.fall.lrot, w); }
+  });
+  fk();
+  tiltQ = new Q().setFromAxisAngle(new V3(1, 0, 0), state.tilt * w * DEG);
+  const hips = bone("Hips");
+  if (hips) { setWorldRot(hips, tiltQ.clone().multiply(hips.wrot)); }
+  fk();
+  bones.forEach(b => b.skin.multiplyMatrices(b.W, b.restWInv));
+  const v = new V3();
+  parts.forEach(pt => {
+    const pos = pt.mesh.geometry.attributes.position, n = pos.count;
+    for (let i = 0; i < n; i++) {
+      v.set(pt.rest[i * 3], pt.rest[i * 3 + 1], pt.rest[i * 3 + 2]).applyMatrix4(bones[pt.bone[i] || 0].skin);
+      pos.setXYZ(i, v.x, v.y, v.z);
+    }
+    pos.needsUpdate = true;
+    pt.mesh.geometry.computeVertexNormals();
+  });
+}
+
+// ---------------------------------------------------------------- the cape as cloth
+// Each vertex gets (s, h): s = -1 at the left edge .. 1 at the right, h = 0 at the shoulders .. 1 at the hem,
+// read from the cape as the game draws it. The "stretched cape" is the same sheet laid out wider: as wide as
+// the arms at the hand point, narrowing to the hem. Rest lengths come from that layout.
+const C = { n: 0, s: [], h: [], pos: [], prev: [], orig: [], edges: [], tris: [], pin: [], mesh: null, ready: false };
+function buildCape() {
+  if (!capeSrc) return;
+  const pt = capeSrc, n = pt.v.length / 3;
+  let xmax = 0, ytop = -1e9, ybot = 1e9;
+  for (let i = 0; i < n; i++) { xmax = Math.max(xmax, Math.abs(pt.v[i * 3])); ytop = Math.max(ytop, pt.v[i * 3 + 1]); ybot = Math.min(ybot, pt.v[i * 3 + 1]); }
+  C.n = n; C.len = ytop - ybot;
+  for (let i = 0; i < n; i++) {
+    C.s.push(pt.v[i * 3] / xmax);                // Unity x < 0 is the character's left
+    C.h.push((ytop - pt.v[i * 3 + 1]) / (ytop - ybot));
+    const p = new V3(-pt.v[i * 3], pt.v[i * 3 + 1], pt.v[i * 3 + 2]);
+    C.orig.push(p.clone()); C.pos.push(p.clone()); C.prev.push(p.clone());
+  }
+  // weld: vertices on the same spot (uv seams) move as one
+  C.rep = new Array(n);
+  const spot = new Map();
+  for (let i = 0; i < n; i++) {
+    const q = C.orig[i], k = Math.round(q.x * 2000) + "," + Math.round(q.y * 2000) + "," + Math.round(q.z * 2000);
+    if (spot.has(k)) C.rep[i] = spot.get(k); else { spot.set(k, i); C.rep[i] = i; }
+  }
+  const seen = new Set();
+  const edge = (a, b) => { if (a === b) return; const k = a < b ? a + "_" + b : b + "_" + a; if (!seen.has(k)) { seen.add(k); C.edges.push({ a, b, orig: C.orig[a].distanceTo(C.orig[b]), rest: 0 }); } };
+  const idx = [];
+  for (let i = 0; i < pt.t.length; i += 3) {
+    const a = pt.t[i], b = pt.t[i + 1], c = pt.t[i + 2];
+    edge(C.rep[a], C.rep[b]); edge(C.rep[b], C.rep[c]); edge(C.rep[c], C.rep[a]);
+    C.tris.push([a, b, c]);
+    idx.push(a, c, b);
+  }
+  // shear: also tie each vertex to its neighbours' neighbours, so the sheet keeps its shape
+  const nb = Array.from({ length: n }, () => new Set());
+  C.edges.forEach(e => { nb[e.a].add(e.b); nb[e.b].add(e.a); });
+  // the main sheet is the biggest connected piece; loose bits (fur tufts, feathers) ride on its nearest point
+  const comp = new Array(n).fill(-1), size = [];
+  for (let i = 0; i < n; i++) {
+    if (C.rep[i] !== i || comp[i] >= 0) continue;
+    const id = size.length, st = [i]; comp[i] = id; let k = 0;
+    while (st.length) { const v = st.pop(); k++; nb[v].forEach(w => { if (comp[w] < 0) { comp[w] = id; st.push(w); } }); }
+    size.push(k);
+  }
+  const big = size.indexOf(Math.max(...size));
+  C.main = Array.from({ length: n }, (_, i) => comp[C.rep[i]] === big);
+  C.glue = [];
+  for (let i = 0; i < n; i++) {
+    if (C.rep[i] !== i || C.main[i]) continue;
+    let best = -1, bd = 1e9;
+    for (let j = 0; j < n; j++) if (C.main[j] && C.rep[j] === j) { const d = C.orig[j].distanceToSquared(C.orig[i]); if (d < bd) { bd = d; best = j; } }
+    if (best >= 0) C.glue.push([i, best, C.orig[i].clone().sub(C.orig[best])]);
+  }
+  for (let i = 0; i < n; i++) if (C.rep[i] !== i) C.glue.push([i, C.rep[i], null]);
+  const first = C.edges.length;
+  for (let i = 0; i < n; i++) nb[i].forEach(j => nb[j].forEach(k => { if (k !== i && !nb[i].has(k)) edge(i, k); }));
+  for (let i = first; i < C.edges.length; i++) C.edges[i].soft = true;
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(n * 3), 3));
+  g.setAttribute("uv", new THREE.BufferAttribute(new Float32Array(pt.uv), 2));
+  g.setIndex(idx);
+  const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, side: THREE.DoubleSide });
+  if (pt.col) mat.color.setRGB(pt.col[0], pt.col[1], pt.col[2]);
+  if (pt.tex) { const tex = new THREE.TextureLoader().load("data:image/png;base64," + pt.tex); tex.encoding = THREE.sRGBEncoding; mat.map = tex; }
+  C.mesh = new THREE.Mesh(g, mat);
+  scene.add(C.mesh);
+  C.ready = true;
+}
+
+// ---------------------------------------------------------------- choosing the cape
+let capeExtra = [], capeItem = null, savedPins = {};
+const pinsByCape = {};   // pins edited in this visit, per cape sheet, kept while you switch
+function selectCape(k) {
+  const cp = PLAYER.capes[k];
+  if (!cp) return;
+  if (capeSrc && C.ready) pinsByCape[skey(capeSrc)] = Object.assign({}, pins);
+  capeExtra.forEach(r => { scene.remove(r.mesh); r.mesh.geometry.dispose(); const j = parts.indexOf(r); if (j >= 0) parts.splice(j, 1); });
+  capeExtra = [];
+  if (C.mesh) { scene.remove(C.mesh); C.mesh.geometry.dispose(); }
+  Object.assign(C, { n: 0, s: [], h: [], pos: [], prev: [], orig: [], edges: [], tris: [], pin: [], rep: [], main: [], glue: [], mesh: null, ready: false });
+  capeSrc = null; capeItem = cp.item;
+  cp.parts.forEach(pt => { if (isSheet(pt)) capeSrc = pt; else addPart(pt, capeExtra); });
+  pose(state.open * state.open * (3 - 2 * state.open));
+  buildCape();
+  if (!C.ready) return;
+  if (pinsByCape[skey(capeSrc)]) pins = Object.assign({}, pinsByCape[skey(capeSrc)]);
+  else if (savedPins[skey(capeSrc)]) { pins = {}; savedPins[skey(capeSrc)].forEach(q => { if (q.v >= 0 && q.v < C.n && q.a) pins[q.v] = q.a; }); }
+  else defaultPins();
+  selV = -1;
+  if (dots) { scene.remove(dots); scene.remove(mark); dots.geometry.dispose(); }
+  makeDots(); showSel(); resetSim(); badge();
+  try { localStorage.setItem("skysailCape", cp.item); } catch (e) { }
+}
+function markCapes() {
+  if (!PLAYER || !PLAYER.capes) return;
+  const opts = $("capeSel").options;
+  PLAYER.capes.forEach((c, i) => {
+    const cl = c.parts.find(isSheet);
+    const done = cl && savedPins[skey(cl)];
+    opts[i].textContent = (done ? "✓ " : "") + c.label + (c.also && c.also.length ? " (+ " + c.also.join(", ") + ")" : "");
+  });
+}
+function badge() {
+  $("badge").textContent = !PLAYER ? "sem personagem exportado" : capeSrc ? "personagem: " + PLAYER.name + " · capa: " + (capeItem || capeSrc.name.replace(/_cloth$/i, "")) : "personagem sem capa: exporte com uma capa no corpo";
+}
+
+// ---------------------------------------------------------------- pins: which cape point goes to which joint
+const ANCHORS = [
+  { id: "", label: "Solto", color: "#9aa3ab" },
+  { id: "body", label: "Costas (como no jogo)", color: "#4aa3ff" },
+  { id: "LeftArm", label: "Ombro esquerdo", color: "#ffc145" }, { id: "RightArm", label: "Ombro direito", color: "#ffc145" },
+  { id: "LeftForeArm", label: "Cotovelo esquerdo", color: "#ff7a45" }, { id: "RightForeArm", label: "Cotovelo direito", color: "#ff7a45" },
+  { id: "LeftHand", label: "Pulso esquerdo", color: "#e0457b" }, { id: "RightHand", label: "Pulso direito", color: "#e0457b" },
+];
+const anchorOf = id => ANCHORS.find(a => a.id === id) || ANCHORS[0];
+let pins = {};   // vertex index -> anchor id
+function otherSide(id) { if (id.includes("Left")) return id.replace("Left", "Right"); if (id.includes("Right")) return id.replace("Right", "Left"); return id; }
+function mirrorVertex(i) {
+  let best = -1, bd = 1e9;
+  for (let j = 0; j < C.n; j++) {
+    if (!C.main[j]) continue;
+    const d = Math.pow(C.s[j] + C.s[i], 2) + Math.pow(C.h[j] - C.h[i], 2) * 4;
+    if (d < bd) { bd = d; best = j; }
+  }
+  return best;
+}
+function nearestEdge(side, h) {   // side -1 = left edge, 1 = right edge
+  let best = -1, bd = 1e9;
+  for (let j = 0; j < C.n; j++) {
+    if (!C.main[j]) continue;
+    if (C.s[j] * side < 0.75) continue;
+    const d = Math.abs(C.h[j] - h);
+    if (d < bd) { bd = d; best = j; }
+  }
+  return best;
+}
+function defaultPins() {
+  pins = {};
+  for (let i = 0; i < C.n; i++) if (C.h[i] < 0.07 && C.main[i] && C.rep[i] === i) pins[i] = "body";
+  [[-1, "Left"], [1, "Right"]].forEach(([side, L]) => {
+    const sh = nearestEdge(side, 0.08), el = nearestEdge(side, 0.18), wr = nearestEdge(side, 0.3);
+    if (sh >= 0) pins[sh] = L + "Arm";
+    if (el >= 0) pins[el] = L + "ForeArm";
+    if (wr >= 0) pins[wr] = L + "Hand";
+  });
+}
+// how far down the cape the wrists hold it (sets the stretched layout)
+function handH() {
+  let sum = 0, k = 0;
+  Object.keys(pins).forEach(i => { if (/Hand$/.test(pins[i])) { sum += C.h[i]; k++; } });
+  return k ? Math.max(0.05, sum / k) : 0.3;
+}
+
+// the body frame after posing: across the shoulders, down the spine, and out of the back
+function frame() {
+  const ls = P("LeftArm"), rs = P("RightArm"), neck = P("Neck"), hips = P("Hips");
+  const o = ls.clone().lerp(rs, 0.5);
+  const R = rs.clone().sub(ls).normalize();                 // towards the right shoulder
+  const D = hips.clone().sub(o); D.addScaledVector(R, -D.dot(R)); D.normalize();
+  const B = new V3(0, 0, -1).applyQuaternion(tiltQ);        // the back faces opposite the chest
+  B.addScaledVector(R, -B.dot(R)).addScaledVector(D, -B.dot(D)).normalize();
+  return { o, R, D, B, ls, rs, lh: P("LeftHand"), rh: P("RightHand"), neck };
+}
+function width(h, F) {
+  const a = handH();
+  const top = 0.22, hands = Math.max(top, F.span);
+  if (h <= a) { const k = h / a; return top + (hands - top) * (k * k * (3 - 2 * k)); }
+  return hands + (hands * state.bottom - hands) * ((h - a) / (1 - a));
+}
+// where a vertex sits on the stretched layout, in the body frame
+function layoutPoint(i, F) {
+  const L = C.h[i] * C.len * state.length;
+  return F.o.clone().addScaledVector(F.R, C.s[i] * width(C.h[i], F)).addScaledVector(F.D, L - 0.02).addScaledVector(F.B, 0.17);
+}
+// where a cape vertex sits when it simply follows its bone (how the game wears it)
+function skinned(i) { return C.orig[i].clone().applyMatrix4(bones[(capeSrc.b && capeSrc.b[i]) || 0].skin); }
+function updateRest(F, w) {
+  if (true) {   // the cape keeps its own shape and lengths
+    const lp = []; for (let i = 0; i < C.n; i++) lp.push(skinned(i));
+    C.edges.forEach(e => { e.rest = e.orig; });
+    return lp;
+  }
+  // layout distances, measured flat, then blended from the cape's own lengths while it opens
+  const lp = []; for (let i = 0; i < C.n; i++) lp.push(layoutPoint(i, F));
+  C.edges.forEach(e => {
+    const flat = lp[e.a].distanceTo(lp[e.b]) * state.slack;
+    e.rest = e.orig + (flat - e.orig) * w;
+  });
+  return lp;
+}
+// pins: "body" points keep their place on the back; the others go to their joint, just over the arm
+function pinTargets(F, lp, w) {
+  C.pin = [];
+  if (true) {   // the top of the cape (by the shoulders) follows the body, as in the game
+    for (let i = 0; i < C.n; i++) if (C.h[i] <= state.top && C.main[i] && C.rep[i] === i) C.pin.push({ i, p: lp[i] });
+    return;
+  }
+  for (let i = 0; i < C.n; i++) {
+    const id = pins[i];
+    if (!id) continue;
+    let target;
+    if (id === "body") target = lp[i];
+    else {
+      const b = bone(id);
+      if (!b) continue;
+      target = b.wpos.clone().addScaledVector(F.B, 0.08);
+    }
+    {
+      const closed = C.orig[i];   // where the cape hangs when folded (the game's own shape)
+      C.pin.push({ i: C.rep[i], p: closed.clone().lerp(target, w) });   // a welded copy pins its twin
+    }
+  }
+}
+
+let simTime = 0;
+// how the player moves: forward (+z) and down, like the mod (W dives: forward ×1.35, down ×1.8; S brakes: ×0.5, ×0.8)
+function flightVel() {
+  let f = state.fwd, d = state.fall;
+  if (state.dive) { f *= 1.35; d *= 1.8; } else if (state.brake) { f *= 0.5; d *= 0.8; }
+  return new V3(0, -d, f);
+}
+function noise3(t, k) { return Math.sin(t * 1.7 + k * 1.3) * 0.6 + Math.sin(t * 3.1 + k * 2.7) * 0.3 + Math.sin(t * 7.3 + k * 0.7) * 0.1; }
+// The cloth. Forces per triangle of the sheet, from the air flowing past (the opposite of how we move):
+//  - pressure: the part of the air hitting the sheet face-on (strong, also damps the flapping)
+//  - friction: the air sliding along the sheet drags it backwards, so it streams out behind like a held flag
+//  - lift: the air under you while you glide holds the sheet up off your back and makes it billow
+//  - flutter: waves running from the arms to the hem, faster the faster you fly
+// The body is gliding, not falling freely, so the cape feels only part of its weight while open.
+const CAPE_KG = 1.2;
+function capsulesOf(F) {
+  const c = [];
+  const add = (a, b, r, torso) => { const A = bone(a), B = bone(b || a); if (A && B) c.push([A.wpos, B.wpos, r, !!torso]); };
+  add("Neck", "Hips", 0.16, true); add("LeftArm", "RightArm", 0.11, true); add("Head", "Head", 0.14, true);
+  add("LeftUpLeg", "LeftLeg", 0.11); add("LeftLeg", "LeftFoot", 0.08); add("RightUpLeg", "RightLeg", 0.11); add("RightLeg", "RightFoot", 0.08);
+  add("LeftArm", "LeftForeArm", 0.07); add("LeftForeArm", "LeftHand", 0.06); add("RightArm", "RightForeArm", 0.07); add("RightForeArm", "RightHand", 0.06);
+  return c;
+}
+const _ab = new V3(), _ap = new V3(), _c = new V3(), _v = new V3();
+function pushOut(p, cap, B) {
+  const [a, b, r, torso] = cap;
+  _ab.subVectors(b, a); _ap.subVectors(p, a);
+  const l2 = _ab.lengthSq();
+  const t = l2 > 1e-8 ? Math.max(0, Math.min(1, _ap.dot(_ab) / l2)) : 0;
+  _c.copy(a).addScaledVector(_ab, t);
+  _v.subVectors(p, _c);
+  let d = _v.length();
+  if (d >= r) return;
+  // anything that slipped under the torso goes back to the back side, not out through the chest
+  if (torso) { const k = _v.dot(B); if (k < 0) _v.addScaledVector(B, -2 * k); }
+  if (d < 1e-5) { _v.copy(B); d = 1; } else d = _v.length();
+  p.copy(_c).addScaledVector(_v, r / d);
+}
+function step(dt, F, w) {
+  const vel0 = flightVel().multiplyScalar(w);
+  const air = vel0.clone().negate();
+  const speed = air.length();
+  const m = CAPE_KG / C.n;
+  const acc = Array.from({ length: C.n }, () => new V3(0, -9.81 * (1 - 0.75 * w), 0));
+  const e1 = new V3(), e2 = new V3(), nn = new V3(), vel = new V3(), rel = new V3(), relT = new V3(), f = new V3();
+  C.tris.forEach(([a, b, c], ti) => {
+    const pa = C.pos[a], pb = C.pos[b], pc = C.pos[c];
+    e1.subVectors(pb, pa); e2.subVectors(pc, pa); nn.crossVectors(e1, e2);
+    const l = nn.length(); if (l < 1e-8) return;
+    const area = l / 2; nn.divideScalar(l);
+    if (nn.dot(F.B) < 0) nn.negate();                   // nn now points out of the back
+    vel.set(0, 0, 0).add(pa).sub(C.prev[a]).add(pb).sub(C.prev[b]).add(pc).sub(C.prev[c]).divideScalar(3 * dt);
+    rel.copy(air).sub(vel);
+    const dn = nn.dot(rel);
+    relT.copy(rel).addScaledVector(nn, -dn);
+    const h = (C.h[a] + C.h[b] + C.h[c]) / 3;
+    const q = 0.6 * area;                                // half the air density times the area
+    f.set(0, 0, 0);
+    f.addScaledVector(nn, q * Math.abs(dn) * dn * state.wind);
+    f.addScaledVector(relT, q * 0.06 * relT.length() * state.trail);
+    f.addScaledVector(nn, q * speed * speed * 0.03 * state.lift * w);
+    const wave = Math.sin(h * 11 - simTime * (3 + 0.7 * speed) + ti * 0.05) + 0.4 * Math.sin(h * 23 - simTime * (5 + 1.1 * speed));
+    f.addScaledVector(nn, q * speed * speed * 0.025 * state.gust * w * h * wave);
+    f.divideScalar(3 * m);
+    acc[a].add(f); acc[b].add(f); acc[c].add(f);
+  });
+  for (let i = 0; i < C.n; i++) {
+    const p = C.pos[i], pr = C.prev[i], ac = acc[i];
+    if (ac.length() > 250) ac.setLength(250);
+    const nx = p.x + (p.x - pr.x) * 0.998 + ac.x * dt * dt;
+    const ny = p.y + (p.y - pr.y) * 0.998 + ac.y * dt * dt;
+    const nz = p.z + (p.z - pr.z) * 0.998 + ac.z * dt * dt;
+    pr.copy(p); p.set(nx, ny, nz);
+  }
+  const pinned = new Set();
+  C.pin.forEach(pn => { C.pos[pn.i].copy(pn.p); pinned.add(pn.i); });
+  const caps = capsulesOf(F);
+  for (let it = 0; it < 10; it++) {
+    for (const e of C.edges) {
+      const pa = C.pos[e.a], pb = C.pos[e.b];
+      e1.subVectors(pb, pa);
+      const d = e1.length(); if (d < 1e-6) continue;
+      if (e.soft && d < e.rest) continue;                // the far ties only stop over-stretching
+      const diff = (d - e.rest) / d * (e.soft ? 0.12 : 1);
+      const fa = pinned.has(e.a) ? 0 : (pinned.has(e.b) ? 1 : 0.5), fb = pinned.has(e.b) ? 0 : (pinned.has(e.a) ? 1 : 0.5);
+      pa.addScaledVector(e1, diff * fa); pb.addScaledVector(e1, -diff * fb);
+    }
+    for (let i = 0; i < C.n; i++) if (!pinned.has(i)) for (const cap of caps) pushOut(C.pos[i], cap, F.B);
+  }
+  glue();
+  simTime += dt;
+}
+function glue() {
+  for (const [i, j, off] of C.glue) { if (off) C.pos[i].copy(C.pos[j]).add(off); else C.pos[i].copy(C.pos[j]); C.prev[i].copy(C.pos[i]); }
+}
+function drawCape() {
+  const pos = C.mesh.geometry.attributes.position;
+  C.pos.forEach((p, i) => pos.setXYZ(i, p.x, p.y, p.z));
+  pos.needsUpdate = true;
+  C.mesh.geometry.computeVertexNormals();
+}
+function resetSim() {
+  if (!C.ready) return;
+  const F = frame(); F.span = spanOf(F);
+  const lp = updateRest(F, state.open);
+  for (let i = 0; i < C.n; i++) { C.pos[i].copy(lp[i]); C.prev[i].copy(lp[i]); }
+  glue();
+}
+function spanOf(F) {
+  const l = F.lh.clone().sub(F.o).dot(F.R), r = F.rh.clone().sub(F.o).dot(F.R);
+  return (Math.abs(l) + Math.abs(r)) / 2 + 0.05;
+}
+
+// ---------------------------------------------------------------- editing the pins
+let editing = false, selV = -1, dots = null, mark = null;
+function makeDots() {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(C.n * 3), 3));
+  g.setAttribute("color", new THREE.BufferAttribute(new Float32Array(C.n * 3), 3));
+  dots = new THREE.Points(g, new THREE.PointsMaterial({ size: 0.05, vertexColors: true, depthTest: false, transparent: true }));
+  dots.renderOrder = 12; scene.add(dots);
+  mark = new THREE.Mesh(new THREE.SphereGeometry(0.035, 16, 12), new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false, transparent: true, opacity: 0.9 }));
+  mark.renderOrder = 13; scene.add(mark);
+}
+function updateDots() {
+  if (!dots) return;
+  dots.visible = editing; mark.visible = editing && selV >= 0;
+  if (!editing) return;
+  const p = dots.geometry.attributes.position, c = dots.geometry.attributes.color, col = new THREE.Color();
+  C.pos.forEach((v, i) => { p.setXYZ(i, v.x, v.y, v.z); col.set(anchorOf(pins[i] || "").color); c.setXYZ(i, col.r, col.g, col.b); });
+  p.needsUpdate = c.needsUpdate = true;
+  if (selV >= 0) mark.position.copy(C.pos[selV]);
+}
+function sideName(i) { return C.s[i] < -0.15 ? "lado esquerdo" : C.s[i] > 0.15 ? "lado direito" : "meio"; }
+function showSel() {
+  if (selV < 0) { $("pinSel").textContent = "Toque num ponto da capa."; return; }
+  $("pinSel").textContent = "Ponto " + selV + " · " + sideName(selV) + " · " + Math.round(C.h[selV] * 100) + "% do ombro até a barra · agora: " + anchorOf(pins[selV] || "").label;
+  document.querySelectorAll("#anchors button").forEach(b => b.setAttribute("aria-pressed", String((pins[selV] || "") === b.dataset.id)));
+}
+function assign(id) {
+  if (selV < 0) return;
+  const set = (i, a) => { if (a) pins[i] = a; else delete pins[i]; };
+  set(selV, id);
+  if ($("mirror").checked) { const m = mirrorVertex(selV); if (m >= 0 && m !== selV) set(m, otherSide(id)); }
+  showSel(); updateDots(); dirty = true;
+}
+ANCHORS.forEach(a => {
+  const b = document.createElement("button");
+  b.dataset.id = a.id;
+  b.innerHTML = '<span class="dot" style="background:' + a.color + '"></span>' + a.label;
+  b.addEventListener("click", () => assign(a.id));
+  $("anchors").append(b);
+});
+[["#9aa3ab", "solto"], ["#4aa3ff", "costas"], ["#ffc145", "ombros"], ["#ff7a45", "cotovelos"], ["#e0457b", "pulsos"]].forEach(([c, t]) => {
+  const sp = document.createElement("span"); sp.innerHTML = '<span class="dot" style="background:' + c + '"></span>' + t; $("legend").append(sp);
+});
+let resumeOpen = 1;
+$("editPins").addEventListener("click", () => {
+  editing = !editing;
+  $("editPins").setAttribute("aria-pressed", String(editing));
+  $("pinTools").hidden = !editing;
+  if (editing) { resumeOpen = openTarget; openTarget = 0; }
+  else { openTarget = resumeOpen; $("openBtn").setAttribute("aria-pressed", String(openTarget === 1)); selV = -1; }
+  showSel(); updateDots();
+});
+$("pinsDefault").addEventListener("click", () => { defaultPins(); showSel(); updateDots(); dirty = true; });
+$("pinsClear").addEventListener("click", () => { Object.keys(pins).forEach(i => { if (pins[i] !== "body") delete pins[i]; }); showSel(); updateDots(); dirty = true; });
+const ray = new THREE.Raycaster();
+let downAt = null, dirty = false;
+renderer.domElement.addEventListener("pointerdown", e => { downAt = [e.clientX, e.clientY]; });
+renderer.domElement.addEventListener("pointerup", e => {
+  if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 6) { downAt = null; return; }
+  downAt = null;
+  if (!editing || !dots) return;
+  const r = renderer.domElement.getBoundingClientRect();
+  ray.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera);
+  ray.params.Points.threshold = 0.035;
+  const h = ray.intersectObject(dots);
+  if (h.length) { selV = h[0].index; showSel(); updateDots(); }
+});
+
+// ---------------------------------------------------------------- controls
+const fmt = {
+  tilt: v => v + "°", top: v => Math.round(v * 100) + "%",
+  bottom: v => Math.round(v * 100) + "%", length: v => Math.round(v * 100) + "%",
+  slack: v => "+" + Math.round((v - 1) * 100) + "%", fwd: v => v + " m/s", fall: v => v + " m/s", wind: v => Math.round(v * 100) + "%", gust: v => Math.round(v * 100) + "%", lift: v => Math.round(v * 100) + "%", trail: v => Math.round(v * 100) + "%",
+};
+Object.keys(fmt).forEach(k => {
+  $(k).addEventListener("input", () => { state[k] = +$(k).value; $(k + "Out").textContent = fmt[k](state[k]); });
+});
+function syncInputs() { Object.keys(fmt).forEach(k => { $(k).value = state[k]; $(k + "Out").textContent = fmt[k](state[k]); }); }
+function preset(f, d) { state.fwd = f; state.fall = d; syncInputs(); }
+[["Cervo", 8, 3.6], ["Troll", 10, 3], ["Lobo", 13, 2.4], ["Lox", 16, 1.9], ["Névoa", 19, 1.5], ["Corvo", 22, 1.2]].forEach(([n, f, d], i) => {
+  const b = document.createElement("button");
+  b.textContent = (i + 1) + " · " + n;
+  b.title = f + " m/s para frente, caindo " + d + " m/s";
+  b.onclick = () => { preset(f, d); document.querySelectorAll("#tierRow button").forEach(x => x.setAttribute("aria-pressed", String(x === b))); };
+  $("tierRow").append(b);
+});
+const toggle = (id, key, off) => $(id).addEventListener("click", () => {
+  state[key] = !state[key]; if (state[key] && off) { state[off] = false; $(off).setAttribute("aria-pressed", "false"); }
+  $(id).setAttribute("aria-pressed", String(state[key]));
+});
+toggle("dive", "dive", "brake"); toggle("brake", "brake", "dive"); toggle("moving", "moving");
+$("resetSim").onclick = resetSim;
+$("defaults").onclick = () => { Object.assign(state, DEFAULTS); syncInputs(); resetSim(); };
+let openTarget = 1;
+$("openBtn").addEventListener("click", () => { openTarget = openTarget ? 0 : 1; $("openBtn").setAttribute("aria-pressed", String(openTarget === 1)); });
+
+// ---------------------------------------------------------------- save / load
+function status(t) { $("status").textContent = t; }
+let db = null;
+async function save() {
+  if (!db) { status("Salvar não está disponível nesta visualização."); return; }
+  $("save").disabled = true;
+  try {
+    const doc = { version: 1, kind: "capeglide", cape: capeSrc ? skey(capeSrc) : null, item: capeItem, savedAt: new Date().toISOString() };
+    // pins per cape mesh (each cape has its own vertices); keep the other capes' pins already saved
+    const old = await db.doc("skysail/capeglide").get();
+    const all = (old.exists && old.data().pins) || {};
+    if (capeSrc && C.ready) pinsByCape[skey(capeSrc)] = Object.assign({}, pins);
+    Object.keys(pinsByCape).forEach(n => { const ps = pinsByCape[n]; all[n] = Object.keys(ps).map(i => ({ v: +i, a: ps[i] })); });
+    delete all["WolfCape_cloth"];   // the old key, now WolfCape_cloth#84
+    doc.pins = all;
+    const items = (old.exists && old.data().items) || {};   // cape sheet -> the game's item name, for the mod
+    (PLAYER && PLAYER.capes || []).forEach(c => { const cl = c.parts.find(isSheet); if (cl) items[skey(cl)] = c.items || [c.item]; });
+    doc.items = items;
+    Object.keys(DEFAULTS).forEach(k => doc[k] = r3(state[k]));
+    await db.doc("skysail/capeglide").set(doc);
+    savedPins = all; markCapes();
+    status("Salvo " + new Date().toLocaleTimeString() + ". Me avise no chat que eu passo para o mod.");
+  } catch (e) { status("Não salvou: " + (e && (e.message || e.code) || e) + ". Tente de novo."); }
+  finally { $("save").disabled = false; }
+}
+$("save").addEventListener("click", save);
+async function load() {
+  try {
+    const s = await db.doc("skysail/capeglide").get();
+    if (!s.exists) { status("Ainda não salvo."); return; }
+    const d = s.data();
+    Object.keys(DEFAULTS).forEach(k => { if (typeof d[k] === "number") state[k] = d[k]; });
+    savedPins = d.pins || {};
+    // pins saved before the key had the vertex count (the wolf cape)
+    Object.keys(savedPins).forEach(k => { if (k.indexOf("#") < 0 && k === "WolfCape_cloth" && !savedPins[k + "#84"]) savedPins[k + "#84"] = savedPins[k]; });
+    markCapes();
+    const mine = capeSrc && savedPins[skey(capeSrc)];
+    if (Array.isArray(mine) && !pinsByCape[skey(capeSrc)]) { pins = {}; mine.forEach(p => { if (p.v >= 0 && p.v < C.n && p.a) pins[p.v] = p.a; }); updateDots(); }
+    syncInputs(); resetSim();
+    status("Carregado o que foi salvo em " + new Date(d.savedAt).toLocaleString());
+  } catch (e) { status("Não consegui ler o que foi salvo: " + (e && (e.message || e.code) || e)); }
+}
+
+// ---------------------------------------------------------------- start
+if (PLAYER) {
+  prepCapes(); buildPlayer(); pose(1);
+  if (PLAYER.capes && PLAYER.capes.length) {
+    const sel = $("capeSel");
+    PLAYER.capes.forEach((c, i) => { const o = document.createElement("option"); o.value = String(i); sel.append(o); });
+    markCapes();
+    let first = PLAYER.capes.findIndex(c => c.item === "CapeWolf");
+    try { const j = PLAYER.capes.findIndex(c => c.item === localStorage.getItem("skysailCape")); if (j >= 0) first = j; } catch (e) { }
+    if (first < 0) first = 0;
+    sel.value = String(first);
+    sel.onchange = () => { selectCape(+sel.value); markCapes(); };
+    selectCape(first);
+  } else {
+    $("capeSel").hidden = true; $("capeNote").textContent = "Só a capa que você vestia ao exportar. Exporte de novo com o mod atualizado para ter todas.";
+    buildCape(); if (C.ready) { defaultPins(); makeDots(); }
+  }
+}
+syncInputs();
+resetSim();
+badge();
+(async () => {
+  try {
+    if (window.claude && claude.use) {
+      const timer = setTimeout(() => status("O banco de dados não respondeu; dá para mexer, mas salvar pode falhar."), 10000);
+      db = await claude.use("db");
+      clearTimeout(timer);
+      if (!db) status("Salvar não está disponível nesta visualização.");
+      else await load();
+    } else status("Abra no Claude para poder salvar.");
+  } catch (e) { status("Erro ao conectar: " + (e && e.message || e)); }
+})();
+let last = performance.now();
+function tick(now) {
+  requestAnimationFrame(tick);
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (PLAYER) {
+    state.open += Math.sign(openTarget - state.open) * Math.min(Math.abs(openTarget - state.open), dt * 2);
+    const w = state.open * state.open * (3 - 2 * state.open);
+    pose(w);
+    moveWorld(dt, flightVel().multiplyScalar(w));
+    if (C.ready) {
+      const F = frame(); F.span = spanOf(F);
+      const lp = updateRest(F, w);
+      pinTargets(F, lp, w);
+      if (false) {
+        // the cape as the game draws it, frozen, so the points are easy to pick
+        for (let i = 0; i < C.n; i++) { C.pos[i].copy(C.orig[i]); C.prev[i].copy(C.orig[i]); }
+      } else {
+        const sub = 4, h = dt / sub;
+        if (h > 0) for (let i = 0; i < sub; i++) step(h, F, w);
+      }
+      drawCape();
+      updateDots();
+    }
+  }
+  orbit.update(); renderer.render(scene, camera);
+}
+resize(); requestAnimationFrame(tick);
+</script>

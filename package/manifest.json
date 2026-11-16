@@ -1,0 +1,9 @@
+{
+  "name": "Skysail",
+  "version_number": "0.1.0",
+  "website_url": "https://github.com/Felihens/Skysail",
+  "description": "Glide with any cape: press Jump in the air and your cape carries you. Better capes fly faster and tire you less. The cape streams in the wind, wind streaks pass by and the landing is softer. Client-side.",
+  "dependencies": [
+    "denikson-BepInExPack_Valheim-5.4.2351"
+  ]
+}

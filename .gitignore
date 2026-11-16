@@ -1,0 +1,10 @@
+bin/
+dist/
+package/plugins/Skysail/Skysail.dll
+backups_wing_*/
+disabled/
+editor/*.html
+!editor/*.template.html
+editor/*.json
+editor/skysail_loft*
+editor/make_editor.py

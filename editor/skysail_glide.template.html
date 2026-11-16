@@ -1,0 +1,553 @@
+<meta charset="utf-8">
+<title>Skysail Glide</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* The glide as the game recorded it: 3D stage on the left, tools on the right (under the stage on phones). */
+:root {
+  --bg: #e4e8eb; --panel: #f3f5f6; --ink: #1c2227; --muted: #5a6670; --line: #cdd5db;
+  --accent: #3e4f7a; --accent-ink: #f4f6ff; --stage: #c6d1d9; --field: #ffffff;
+  --display: "Barlow Condensed", "Arial Narrow", sans-serif; --body: "Inter", system-ui, sans-serif; --mono: "JetBrains Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #121519; --panel: #191d22; --ink: #e2e7eb; --muted: #95a2ac; --line: #2c343a;
+  --accent: #9fb3ea; --accent-ink: #10131c; --stage: #1d242b; --field: #10151a; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #121519; --panel: #191d22; --ink: #e2e7eb; --muted: #95a2ac; --line: #2c343a;
+  --accent: #9fb3ea; --accent-ink: #10131c; --stage: #1d242b; --field: #10151a; color-scheme: dark }
+html, body { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 14px; }
+.app { height: 100%; display: flex; min-height: 0; }
+.stage { flex: 1; min-width: 0; position: relative; background: var(--stage); }
+.stage canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.hint { position: absolute; left: max(12px, env(safe-area-inset-left, 0px)); bottom: 10px; right: 12px; font-size: 12px; color: var(--muted); pointer-events: none; line-height: 1.4; }
+.badge { position: absolute; top: 10px; left: max(12px, env(safe-area-inset-left, 0px)); font-family: var(--mono); font-size: 11px; color: var(--muted); background: var(--panel); border: 1px solid var(--line); border-radius: 5px; padding: 3px 7px; }
+.views { position: absolute; top: 10px; right: max(12px, env(safe-area-inset-right, 0px)); display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+.views button { padding: 4px 8px; font-size: 12px; }
+select { width: 100%; font: inherit; color: var(--ink); background: var(--field); border: 1px solid var(--line); border-radius: 6px; padding: 7px 8px; }
+.rail { width: 350px; flex: none; background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto;
+  padding-block: 18px; padding-left: 18px; padding-right: max(18px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 20px; box-sizing: border-box; }
+h1 { font-family: var(--display); font-weight: 700; font-size: 28px; margin: 0; letter-spacing: .03em; text-transform: uppercase; line-height: 1; }
+.sub { color: var(--muted); margin: 6px 0 0; line-height: 1.45; }
+h2 { font-family: var(--display); font-size: 15px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin: 0 0 8px; font-weight: 600; }
+.row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+button { font: inherit; cursor: pointer; border-radius: 6px; border: 1px solid var(--line); background: var(--field); color: var(--ink); padding: 6px 10px; }
+button:hover { border-color: var(--accent); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+button:disabled { opacity: .5; cursor: default; }
+.grid2 { display: grid; grid-template-columns: auto 1fr auto; gap: 8px 10px; align-items: center; }
+.grid2 label { color: var(--muted); }
+.grid2 output { font-family: var(--mono); font-size: 12px; min-width: 52px; text-align: right; font-variant-numeric: tabular-nums; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+.check { display: flex; gap: 6px; align-items: center; color: var(--muted); }
+.note { font-size: 12px; color: var(--muted); line-height: 1.45; margin: 8px 0 0; }
+.status { font-family: var(--mono); font-size: 12px; color: var(--muted); min-height: 1.4em; }
+.changed { font-size: 12px; color: var(--muted); font-family: var(--mono); margin-top: 6px; line-height: 1.5; }
+[hidden] { display: none !important; }
+@media (max-width: 760px) {
+  .app { flex-direction: column; }
+  .stage { flex: none; height: 56%; }
+  .rail { width: auto; border-left: none; border-top: 1px solid var(--line); flex: 1; padding-left: 16px; padding-right: 16px; }
+}
+</style>
+
+<div class="app">
+  <div class="stage" id="stage">
+    <div class="badge" id="badge">carregando…</div>
+    <div class="views">
+      <button id="vBack">Atrás</button><button id="vSide">Lado</button><button id="vTop">Cima</button><button id="vFront">Frente</button>
+    </div>
+    <div class="hint">Arraste para girar a câmera, role ou pinça para zoom. O corpo é o que o jogo gravou durante o voo; as mudanças desta página entram por cima.</div>
+  </div>
+  <aside class="rail">
+    <div>
+      <h1>Skysail Glide</h1>
+      <p class="sub">O voo gravado no jogo: os ossos do corpo quadro a quadro e a capa como o jogo desenhou. Ajuste a pose que o mod segura no voo; a capa se ajusta no próprio jogo.</p>
+    </div>
+
+    <div>
+      <h2>Gravação</h2>
+      <div class="row">
+        <button id="playHold" aria-pressed="true">Pose travada</button>
+        <button id="playAll" aria-pressed="false">Gravação inteira</button>
+        <button id="pause" aria-pressed="false">Pausar</button>
+      </div>
+      <div class="grid2" style="margin-top:10px">
+        <label for="scrub">Quadro</label><input id="scrub" type="range" min="0" max="1" step="1"><output id="scrubOut"></output>
+      </div>
+      <label class="check" style="margin-top:8px"><input type="checkbox" id="ghost"> Mostrar também a malha da capa em arame</label>
+      <p class="note" id="recNote"></p>
+    </div>
+
+    <div>
+      <h2>Capa</h2>
+      <select id="capeSel" aria-label="Qual capa ver"></select>
+      <p class="note">A capa com que você gravou aparece exatamente como o jogo desenhou, com a física de tecido dele (MagicaCloth). Ela não acompanha as mudanças de pose desta página: isso só dá para ver no jogo. As outras capas aparecem aproximadas, presas no corpo, sem física.</p>
+    </div>
+
+    <div>
+      <h2>Pose do corpo</h2>
+      <div class="grid2">
+        <label for="tilt">Inclinação</label><input id="tilt" type="range" min="0" max="100" step="1"><output id="tiltOut"></output>
+      </div>
+      <div class="row" style="margin-top:10px; flex-wrap:nowrap">
+        <select id="boneSel" aria-label="Parte do corpo"></select>
+        <select id="sideSel" aria-label="Lado" style="width:auto"><option value="L">Esquerdo</option><option value="R">Direito</option></select>
+      </div>
+      <label class="check" style="margin-top:8px"><input type="checkbox" id="mirror" checked> Mesmo ajuste espelhado no outro lado</label>
+      <div class="grid2" style="margin-top:10px">
+        <label for="rx">Girar X</label><input id="rx" type="range" min="-90" max="90" step="1"><output id="rxOut"></output>
+        <label for="ry">Girar Y</label><input id="ry" type="range" min="-90" max="90" step="1"><output id="ryOut"></output>
+        <label for="rz">Girar Z</label><input id="rz" type="range" min="-90" max="90" step="1"><output id="rzOut"></output>
+      </div>
+      <div class="row" style="margin-top:8px"><button id="boneReset">Zerar esta parte</button><button id="poseReset">Zerar o corpo todo</button></div>
+      <div class="changed" id="changed"></div>
+      <p class="note">Os eixos são os do próprio osso no jogo: experimente cada um e veja para onde a parte gira. Inclinação: 0° em pé, 90° deitado (no mod é BodyTilt).</p>
+    </div>
+
+    <div>
+      <h2>Capa no voo</h2>
+      <p class="note" style="margin-top:0">A capa é tecido de verdade no jogo, então ela se ajusta lá, ao vivo: plane, aperte F1 (Configuration Manager), abra Skysail e mexa em "3 - Cape". Stream empurra a capa para trás, Gravity é o peso dela, Flutter, Turbulence e Frequency fazem ela tremular, MovingWind é o vento da sua própria velocidade.</p>
+    </div>
+
+    <div>
+      <h2>Salvar</h2>
+      <div class="row">
+        <button class="primary" id="save">Salvar para o mod</button>
+        <button id="defaults">Voltar ao padrão</button>
+      </div>
+      <p class="status" id="status"></p>
+    </div>
+  </aside>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script id="player" type="application/json">__PLAYER__</script>
+<script id="rec" type="application/json">__REC__</script>
+<script>
+"use strict";
+// Unity (left-handed) -> three.js: position (x,y,z) -> (-x,y,z), quaternion (x,y,z,w) -> (x,-y,-z,w), winding reversed.
+const PLAYER = JSON.parse(document.getElementById("player").textContent || "null");
+const REC = JSON.parse(document.getElementById("rec").textContent || "null");
+const $ = id => document.getElementById(id);
+const V3 = THREE.Vector3, Q = THREE.Quaternion, M4 = THREE.Matrix4;
+const ONE = new V3(1, 1, 1), DEG = Math.PI / 180;
+const qU = q => new Q(q[0], -q[1], -q[2], q[3]);
+const r3 = n => Math.round(n * 1000) / 1000;
+// Quaternion.Euler(x, y, z) of Unity (z, then x, then y), turned into three's space
+function unityEuler(x, y, z) {
+  const qx = new Q().setFromAxisAngle(new V3(1, 0, 0), x * DEG);
+  const qy = new Q().setFromAxisAngle(new V3(0, 1, 0), y * DEG);
+  const qz = new Q().setFromAxisAngle(new V3(0, 0, 1), z * DEG);
+  const u = qy.multiply(qx).multiply(qz);
+  return new Q(u.x, -u.y, -u.z, u.w);
+}
+// Unity AngleAxis about the player's right (x) or forward (z) axis, in three's space
+const unityAxis = (axis, deg) => { const u = new Q().setFromAxisAngle(axis, deg * DEG); return new Q(u.x, -u.y, -u.z, u.w); };
+const X_AXIS = new V3(1, 0, 0), Z_AXIS = new V3(0, 0, 1);
+const LEGS = new Set(["LeftUpLeg", "RightUpLeg", "LeftLeg", "RightLeg", "LeftFoot", "RightFoot", "LeftToeBase", "RightToeBase"]);
+
+const DEFAULTS = { tilt: REC && typeof REC.tilt === "number" ? REC.tilt : 60 };
+const CAPE0 = { back: 0, up: 0, release: 0, pitch: 0, sway: 0, rate: 0.8 };   // the cape is the game's cloth: no edits here
+const state = Object.assign({ pose: {} }, CAPE0, DEFAULTS);   // pose: bone name -> [x, y, z] degrees added to the bone
+
+// ---------------------------------------------------------------- scene
+const stage = $("stage");
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+renderer.outputEncoding = THREE.sRGBEncoding;
+stage.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(40, 1, 0.05, 200);
+const orbit = new THREE.OrbitControls(camera, renderer.domElement);
+orbit.enableDamping = true;
+scene.add(new THREE.HemisphereLight(0xe4ecf4, 0x4a4036, 0.9));
+const sun = new THREE.DirectionalLight(0xffffff, 0.85); sun.position.set(2, 6, 3); scene.add(sun);
+const grid = new THREE.GridHelper(20, 40, 0x7f8c96, 0x9aa6af); grid.position.y = -0.6; grid.material.transparent = true; grid.material.opacity = 0.35; scene.add(grid);
+function view(k) {
+  orbit.target.set(0, 1.0, 0);
+  if (k === "back") camera.position.set(0, 2.2, -3.2);
+  else if (k === "side") camera.position.set(3.6, 1.2, 0.2);
+  else if (k === "front") camera.position.set(0, 1.0, 3.4);
+  else camera.position.set(0.01, 4.4, 0.3);
+}
+view("back");
+$("vBack").onclick = () => view("back"); $("vSide").onclick = () => view("side"); $("vTop").onclick = () => view("top"); $("vFront").onclick = () => view("front");
+function resize() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / Math.max(1, h); camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(stage);
+
+// ---------------------------------------------------------------- skeleton (rest from the character export)
+const bones = [], byName = {};
+function buildBones() {
+  PLAYER.bones.forEach((b, i) => {
+    const restW = new M4().compose(new V3(-b.pos[0], b.pos[1], b.pos[2]), qU(b.rot), ONE);
+    bones.push({ n: b.n, p: b.p, restW, restWInv: restW.clone().invert(), rest: null, W: new M4(), skin: new M4(), wpos: new V3() });
+    if (byName[b.n] === undefined) byName[b.n] = i;
+  });
+  bones.forEach(b => {
+    const local = b.p < 0 ? b.restW.clone() : new M4().multiplyMatrices(bones[b.p].restWInv, b.restW);
+    const lpos = new V3(), lrot = new Q(); local.decompose(lpos, lrot, new V3());
+    b.rest = { lpos, lrot };
+  });
+}
+
+// ---------------------------------------------------------------- the recording: per frame, each bone's local transform
+const frames = [];   // { t, local: [ {lpos, lrot} | null per bone ], cape: Float32Array[] }
+let firstHeld = 0, badFrames = 0;
+function capeJump(a, b) { let m = 0; for (let i = 0; i < a.length; i++) m = Math.max(m, Math.abs(a[i] - b[i])); return m; }
+function buildFrames() {
+  const ri = {}; REC.bones.forEach((b, i) => ri[b.n] = i);
+  REC.frames.forEach(f => {
+    const W = REC.bones.map((rb, i) => { const p = f.bones[i]; return p ? new M4().compose(new V3(-p[0], p[1], p[2]), qU(p.slice(3)), ONE) : null; });
+    const local = bones.map(b => {
+      const i = ri[b.n]; if (i === undefined || !W[i]) return null;
+      let L;
+      if (b.p < 0) L = W[i].clone();
+      else { const pi = ri[bones[b.p].n]; if (pi === undefined || !W[pi]) return null; L = W[pi].clone().invert().multiply(W[i]); }
+      const lpos = new V3(), lrot = new Q(); L.decompose(lpos, lrot, new V3());
+      return { lpos, lrot };
+    });
+    const cape = (f.cape || []).map(a => { const o = new Float32Array(a.length); for (let i = 0; i < a.length; i += 3) { o[i] = -a[i]; o[i + 1] = a[i + 1]; o[i + 2] = a[i + 2]; } return o; });
+    frames.push({ t: f.t, local, cape });
+  });
+  // single frames where the game's cape mesh jumped (bones still): show the frame before instead
+  const jumps = [];
+  for (let j = 1; j < frames.length - 1; j++) {
+    const a = frames[j].cape[0], p = frames[j - 1].cape[0], n = frames[j + 1].cape[0];
+    if (a && p && n && capeJump(a, p) > 0.3 && capeJump(a, n) > 0.3) { frames[j].cape = frames[j - 1].cape; badFrames++; jumps.push(j); }
+  }
+  // the held pose: after the last jump and after the body stops moving
+  let still = frames.length - 1;
+  const hand = j => { const i = byName["LeftHand"]; return frames[j].local[i] ? frames[j].local[i].lrot : null; };
+  for (let j = frames.length - 2; j > 0; j--) { const a = hand(j), b = hand(j + 1); if (!a || !b || a.angleTo(b) > 0.02) break; still = j; }
+  firstHeld = Math.max(still, jumps.length ? jumps[jumps.length - 1] + 1 : 0);
+  if (firstHeld > frames.length - 5) firstHeld = Math.max(0, frames.length - 20);
+}
+
+// ---------------------------------------------------------------- meshes
+function makeMesh(pt) {
+  const n = pt.v.length / 3, rest = new Float32Array(pt.v.length);
+  for (let i = 0; i < n; i++) { rest[i * 3] = -pt.v[i * 3]; rest[i * 3 + 1] = pt.v[i * 3 + 1]; rest[i * 3 + 2] = pt.v[i * 3 + 2]; }
+  const idx = [];
+  for (let i = 0; i < pt.t.length; i += 3) idx.push(pt.t[i], pt.t[i + 2], pt.t[i + 1]);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(rest.slice(), 3));
+  if (pt.uv && pt.uv.length === n * 2) g.setAttribute("uv", new THREE.BufferAttribute(new Float32Array(pt.uv), 2));
+  g.setIndex(idx);
+  const mat = new THREE.MeshStandardMaterial({ color: 0xcfc4b5, roughness: 0.85, side: THREE.DoubleSide });
+  if (pt.col) mat.color.setRGB(pt.col[0], pt.col[1], pt.col[2]);
+  if (pt.tex) { const tex = new THREE.TextureLoader().load("data:image/png;base64," + pt.tex); tex.encoding = THREE.sRGBEncoding; mat.map = tex; }
+  const mesh = new THREE.Mesh(g, mat);
+  scene.add(mesh);
+  return { mesh, rest, b: pt.b || [], n };
+}
+const body = [];
+let capes = [], cape = null;   // cape: { parts: [mesh recs], top, bottom }
+function buildMeshes() {
+  const capeNames = new Set();
+  (PLAYER.capes || []).forEach(c => c.parts.forEach(q => capeNames.add(q.name)));
+  PLAYER.parts.forEach(pt => { if (/_cloth$/i.test(pt.name) || capeNames.has(pt.name)) return; body.push(makeMesh(pt)); });
+  const order = ["CapeDeerHide", "CapeTrollHide", "CapeWolf", "CapeLinen", "CapeLox", "CapeFeather", "CapeAsksvin", "CapeAsh", "CapeDeepNorth", "CapeDeepNorthMage", "CapeOdin"];
+  const seen = {};
+  (PLAYER.capes || []).forEach(c => {
+    if (/^(CapeTest|GoblinBrute_)/.test(c.item) || !c.parts.length) return;
+    const key = c.parts.map(p => p.name + "#" + p.v.length).join("+");
+    if (seen[key]) { seen[key].also.push(c.label); return; }
+    seen[key] = c; c.also = []; capes.push(c);
+  });
+  const rank = c => { const i = order.indexOf(c.item); return i < 0 ? 100 : i; };
+  capes.sort((a, b) => rank(a) - rank(b));
+}
+function selectCape(k) {
+  if (cape) cape.parts.forEach(r => { scene.remove(r.mesh); r.mesh.geometry.dispose(); });
+  const c = capes[k];
+  // the recorded cape with its skin data: rebuilt exactly as the game skins it
+  const recKey = (REC.cape || []).map(rc => rc.name + "#" + (rc.uv.length / 2)).join("+");
+  const exact = recKey && c.parts.map(p => p.name + "#" + (p.v.length / 3)).join("+") === recKey && REC.cape.every(rc => rc.mv);
+  const parts = exact ? REC.cape.map(exactPart) : c.parts.map(makeMesh);
+  exactCape = !!exact;
+  let top = -1e9, bottom = 1e9;
+  parts.forEach(r => { for (let i = 0; i < r.n; i++) { const y = r.rest[i * 3 + 1]; top = Math.max(top, y); bottom = Math.min(bottom, y); } });
+  cape = { parts, top, bottom, item: c.item, key: c.parts.map(p => p.name + "#" + (p.v.length / 3)).join("+") };
+  try { localStorage.setItem("skysailGlideCape", c.item); } catch (e) { }
+  badge();
+}
+// Unity matrix (row-major list) -> three's space (mirror x on both sides)
+function conj(a) {
+  const m = new M4(); m.set.apply(m, a);
+  const e = m.elements;
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) if ((r === 0) !== (c === 0)) e[c * 4 + r] *= -1;
+  return m;
+}
+let exactCape = false;
+function exactPart(rc) {
+  const r = makeMesh({ v: rc.mv, t: rc.t, uv: rc.uv, tex: rc.tex });
+  r.exact = true;
+  r.bind = rc.bind.map(conj);
+  r.sbone = rc.sb.map(ri => ri < 0 ? -1 : byName[REC.bones[ri].n]);
+  r.sscale = rc.sb.map(ri => { const s = ri >= 0 && REC.bones[ri].s; return s ? new M4().makeScale(s[0], s[1], s[2]) : new M4(); });
+  r.legs = rc.sb.map(ri => ri >= 0 && LEGS.has(REC.bones[ri].n));
+  r.bw = rc.bw;
+  r.smrInv3 = new THREE.Matrix3().setFromMatrix4(conj(rc.smr).invert());
+  r.spineJ = -1;
+  ["Spine", "Spine1", "Spine2", "Hips"].some(nm => { const j = rc.sb.findIndex(ri => ri >= 0 && REC.bones[ri].n === nm); if (j >= 0) r.spineJ = j; return j >= 0; });
+  r.K = rc.sb.map(() => new M4());
+  return r;
+}
+// the recorded cape as the game drew it that frame (its cloth simulated by the game)
+function showRecordedCape(f) {
+  cape.parts.forEach((r, k) => {
+    const src = frames[f].cape[k]; if (!src || src.length !== r.n * 3) return;
+    const pos = r.mesh.geometry.attributes.position;
+    pos.array.set(src); pos.needsUpdate = true; r.mesh.geometry.computeVertexNormals();
+  });
+}
+// the cape exactly as the game drew it in the recording (only the cape it was recorded with)
+let ghost = null;
+function buildGhost() {
+  const rc = REC.cape && REC.cape[0]; if (!rc) return;
+  const idx = []; for (let i = 0; i < rc.t.length; i += 3) idx.push(rc.t[i], rc.t[i + 2], rc.t[i + 1]);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(frames[0].cape[0].length), 3));
+  g.setIndex(idx);
+  ghost = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0xff5a36, wireframe: true, transparent: true, opacity: 0.8 }));
+  ghost.visible = false; scene.add(ghost);
+}
+
+// ---------------------------------------------------------------- pose: the recorded frame plus the edits
+const tmpM = new M4(), tmpL = new M4();
+let swaySkin = new M4();
+function poseFrame(f, time) {
+  const fr = frames[f];
+  const tiltDelta = state.tilt - DEFAULTS.tilt;
+  bones.forEach((b, i) => {
+    const L = fr.local[i] || b.rest;
+    const lrot = L.lrot.clone();
+    const off = state.pose[b.n];
+    if (off) lrot.multiply(unityEuler(off[0], off[1], off[2]));
+    tmpL.compose(L.lpos, lrot, ONE);
+    if (b.p < 0) b.W.copy(tmpL); else b.W.multiplyMatrices(bones[b.p].W, tmpL);
+    if (b.n === "Hips" && tiltDelta) {
+      // lean the whole body about the hips, around the player's right
+      const p = new V3().setFromMatrixPosition(b.W);
+      const R = new M4().makeRotationFromQuaternion(unityAxis(X_AXIS, tiltDelta));
+      b.W.premultiply(new M4().makeTranslation(-p.x, -p.y, -p.z)).premultiply(R).premultiply(new M4().makeTranslation(p.x, p.y, p.z));
+    }
+    b.wpos.setFromMatrixPosition(b.W);
+    b.skin.multiplyMatrices(b.W, b.restWInv);
+  });
+  // the mod's sway bone: hangs from the top of the back (Spine2), turns with the hips, then the wind lifts and shakes it
+  const hips = bones[byName["Hips"]], sp2 = bones[byName["Spine2"]];
+  const rest0 = new M4().compose(new V3().setFromMatrixPosition(sp2.restW), new Q().setFromRotationMatrix(hips.restW), ONE);
+  const cur = new M4().multiplyMatrices(hips.W, new M4().multiplyMatrices(hips.restWInv, rest0));
+  const piv = sp2.wpos.clone();
+  const w = 2 * Math.PI * state.rate * time;
+  const angle = state.pitch + state.sway * Math.sin(w);
+  const side = state.sway * 0.5 * Math.sin(w * 0.73 + 1.3);
+  const R = new M4().makeRotationFromQuaternion(unityAxis(Z_AXIS, side).multiply(unityAxis(X_AXIS, angle)));
+  // turn about the top of the back
+  swayR = new M4().makeTranslation(piv.x, piv.y, piv.z).multiply(R).multiply(new M4().makeTranslation(-piv.x, -piv.y, -piv.z));
+  swaySkin = swayR.clone().multiply(cur).multiply(rest0.clone().invert());
+}
+let swayR = new M4();
+// the game's skinning: up to 4 bones per vertex, each bone times its bind pose; the legs' share goes to the sway
+// bone (the spine's bind pose, turned about the top of the back), and the offset moves the mesh before skinning
+const vc = new V3(), vacc = new V3(), dOff = new V3();
+function skinExact(r) {
+  r.K.forEach((K, j) => { const bi = r.sbone[j]; if (bi < 0 || bi === undefined) { K.identity(); return; } K.multiplyMatrices(bones[bi].W, r.sscale[j]).multiply(r.bind[j]); });
+  const Ks = r.spineJ >= 0 ? swayR.clone().multiply(r.K[r.spineJ]) : null;
+  dOff.set(0, state.up, -state.back).applyMatrix3(r.smrInv3);
+  const pos = r.mesh.geometry.attributes.position, bw = r.bw;
+  for (let i = 0; i < r.n; i++) {
+    const x = r.rest[i * 3] + dOff.x, y = r.rest[i * 3 + 1] + dOff.y, z = r.rest[i * 3 + 2] + dOff.z;
+    vacc.set(0, 0, 0); let ws = 0;
+    for (let k = 0; k < 4; k++) {
+      const j = bw[i * 8 + k], w = bw[i * 8 + 4 + k];
+      if (!w) continue;
+      let wl = w;
+      if (Ks && r.legs[j] && state.release > 0) { ws += w * state.release; wl = w * (1 - state.release); }
+      vc.set(x, y, z).applyMatrix4(r.K[j]); vacc.addScaledVector(vc, wl);
+    }
+    if (ws > 0) { vc.set(x, y, z).applyMatrix4(Ks); vacc.addScaledVector(vc, ws); }
+    pos.setXYZ(i, vacc.x, vacc.y, vacc.z);
+  }
+  pos.needsUpdate = true; r.mesh.geometry.computeVertexNormals();
+}
+const va = new V3(), vb = new V3();
+function skinBody() {
+  body.forEach(r => {
+    const pos = r.mesh.geometry.attributes.position;
+    for (let i = 0; i < r.n; i++) {
+      va.set(r.rest[i * 3], r.rest[i * 3 + 1], r.rest[i * 3 + 2]).applyMatrix4(bones[r.b[i] || 0].skin);
+      pos.setXYZ(i, va.x, va.y, va.z);
+    }
+    pos.needsUpdate = true; r.mesh.geometry.computeVertexNormals();
+  });
+}
+function skinCape() {
+  if (!cape) return;
+  cape.parts.forEach(r => {
+    if (r.exact) { skinExact(r); return; }
+    const pos = r.mesh.geometry.attributes.position;
+    for (let i = 0; i < r.n; i++) {
+      // moved on the body before skinning: back is -z, up is +y (in the standing export)
+      const x = r.rest[i * 3], y = r.rest[i * 3 + 1] + state.up, z = r.rest[i * 3 + 2] - state.back;
+      const bi = r.b[i] || 0;
+      va.set(x, y, z).applyMatrix4(bones[bi].skin);
+      const ws = LEGS.has(bones[bi].n) ? state.release : 0;
+      if (ws > 0) { vb.set(x, y, z).applyMatrix4(swaySkin); va.lerp(vb, ws); }
+      pos.setXYZ(i, va.x, va.y, va.z);
+    }
+    pos.needsUpdate = true; r.mesh.geometry.computeVertexNormals();
+  });
+}
+function drawGhost(f) {
+  if (!ghost || !ghost.visible) return;
+  ghost.geometry.attributes.position.array.set(frames[f].cape[0]);
+  ghost.geometry.attributes.position.needsUpdate = true;
+}
+
+// ---------------------------------------------------------------- UI
+let mode = "hold", paused = false, cursor = 0, clock = 0, playT = 0;
+function badge() {
+  if (!PLAYER || !REC) { $("badge").textContent = "falta o personagem ou a gravação"; return; }
+  const c = cape ? capes.find(x => x.item === cape.item) : null;
+  $("badge").textContent = (c ? c.label + (exactCape ? " (como o jogo desenhou)" : " (aproximada, sem física)") : "sem capa") + " · quadro " + Math.floor(cursor) + " · " + frames[Math.floor(cursor)].t.toFixed(2) + " s";
+}
+function setMode(m) {
+  mode = m; $("playHold").setAttribute("aria-pressed", String(m === "hold")); $("playAll").setAttribute("aria-pressed", String(m === "all"));
+  if (m === "hold" && cursor < firstHeld) cursor = firstHeld;
+}
+$("playHold").onclick = () => setMode("hold");
+$("playAll").onclick = () => { setMode("all"); cursor = 0; };
+$("pause").onclick = () => { paused = !paused; $("pause").setAttribute("aria-pressed", String(paused)); };
+$("scrub").oninput = () => { cursor = +$("scrub").value; paused = true; $("pause").setAttribute("aria-pressed", "true"); if (cursor < firstHeld) setMode("all"); };
+$("ghost").onchange = () => { if (ghost) ghost.visible = $("ghost").checked; };
+
+const fmt = {
+  tilt: v => v.toFixed(0) + "°",
+};
+Object.keys(fmt).forEach(k => $(k).addEventListener("input", () => { state[k] = +$(k).value; $(k + "Out").textContent = fmt[k](state[k]); }));
+function syncInputs() { Object.keys(fmt).forEach(k => { $(k).value = state[k]; $(k + "Out").textContent = fmt[k](state[k]); }); syncBone(); }
+
+// body parts: one entry per bone pair (left/right) or single bone
+const PARTS = [
+  ["Arm", "Braço"], ["ForeArm", "Antebraço"], ["Hand", "Mão"], ["Shoulder", "Ombro (clavícula)"],
+  ["UpLeg", "Coxa"], ["Leg", "Canela"], ["Foot", "Pé"],
+  ["Head", "Cabeça", 1], ["Neck", "Pescoço", 1], ["Spine2", "Peito", 1], ["Spine1", "Barriga", 1], ["Spine", "Cintura", 1], ["Hips", "Quadril", 1],
+];
+PARTS.forEach(([k, label]) => { const o = document.createElement("option"); o.value = k; o.textContent = label; $("boneSel").append(o); });
+function boneName() { const p = PARTS.find(x => x[0] === $("boneSel").value); return p[2] ? p[0] : ($("sideSel").value === "L" ? "Left" : "Right") + p[0]; }
+function otherSide(n) { return n.startsWith("Left") ? "Right" + n.slice(4) : n.startsWith("Right") ? "Left" + n.slice(5) : null; }
+function syncBone() {
+  const single = !!PARTS.find(x => x[0] === $("boneSel").value)[2];
+  $("sideSel").disabled = single;
+  const o = state.pose[boneName()] || [0, 0, 0];
+  ["rx", "ry", "rz"].forEach((id, a) => { $(id).value = o[a]; $(id + "Out").textContent = o[a].toFixed(0) + "°"; });
+  const list = Object.keys(state.pose).filter(n => state.pose[n].some(v => v)).map(n => n + " " + state.pose[n].map(v => v.toFixed(0)).join("/"));
+  $("changed").textContent = list.length ? "Mudado: " + list.join(", ") : "Nada mudado: é a pose gravada.";
+}
+function setBone(o) {
+  const n = boneName();
+  if (o.every(v => !v)) delete state.pose[n]; else state.pose[n] = o;
+  const m = otherSide(n);
+  if (m && $("mirror").checked) { if (o.every(v => !v)) delete state.pose[m]; else state.pose[m] = [o[0], -o[1], -o[2]]; }   // mirrored across the body
+  syncBone();
+}
+["rx", "ry", "rz"].forEach(id => $(id).addEventListener("input", () => setBone([+$("rx").value, +$("ry").value, +$("rz").value])));
+$("boneSel").onchange = syncBone; $("sideSel").onchange = syncBone;
+$("boneReset").onclick = () => setBone([0, 0, 0]);
+$("poseReset").onclick = () => { state.pose = {}; syncBone(); };
+$("defaults").onclick = () => { Object.assign(state, DEFAULTS); state.pose = {}; syncInputs(); };
+
+// ---------------------------------------------------------------- save / load (the mod reads skysail/glide)
+function status(t) { $("status").textContent = t; }
+let db = null;
+async function save() {
+  if (!db) { status("Salvar não está disponível nesta visualização."); return; }
+  $("save").disabled = true;
+  try {
+    const pose = {}; Object.keys(state.pose).forEach(n => { if (state.pose[n].some(v => v)) pose[n] = state.pose[n].map(r3); });
+    const doc = { version: 1, kind: "glide", savedAt: new Date().toISOString(), pose, cape: cape ? cape.item : null };
+    Object.keys(DEFAULTS).forEach(k => doc[k] = r3(state[k]));
+    await db.doc("skysail/glide").set(doc);
+    status("Salvo " + new Date().toLocaleTimeString() + ". Me avise no chat que eu passo para o mod.");
+  } catch (e) { status("Não salvou: " + (e && (e.message || e.code) || e) + ". Tente de novo."); }
+  finally { $("save").disabled = false; }
+}
+$("save").addEventListener("click", save);
+async function load() {
+  try {
+    const s = await db.doc("skysail/glide").get();
+    if (!s.exists) { status("Ainda não salvo."); return; }
+    const d = s.data();
+    Object.keys(DEFAULTS).forEach(k => { if (typeof d[k] === "number") state[k] = d[k]; });
+    state.pose = {}; Object.keys(d.pose || {}).forEach(n => { const o = d.pose[n]; if (Array.isArray(o) && o.length === 3) state.pose[n] = o.map(Number); });
+    syncInputs();
+    status("Carregado o que foi salvo em " + new Date(d.savedAt).toLocaleString());
+  } catch (e) { status("Não consegui ler o que foi salvo: " + (e && (e.message || e.code) || e)); }
+}
+
+// ---------------------------------------------------------------- start
+if (PLAYER && REC && REC.frames && REC.frames.length) {
+  buildBones(); buildFrames(); buildMeshes(); buildGhost();
+  $("scrub").max = String(frames.length - 1);
+  const sel = $("capeSel");
+  capes.forEach((c, i) => { const o = document.createElement("option"); o.value = String(i); o.textContent = c.label + (c.also.length ? " (= " + c.also.join(", ") + ")" : ""); sel.append(o); });
+  const recName = REC.cape && REC.cape[0] ? REC.cape[0].name + "#" + (REC.cape[0].uv.length / 2) : "";
+  let first = capes.findIndex(c => c.parts.some(p => p.name + "#" + (p.v.length / 3) === recName));
+  try { const j = capes.findIndex(c => c.item === localStorage.getItem("skysailGlideCape")); if (j >= 0) first = j; } catch (e) { }
+  if (first < 0) first = 0;
+  sel.value = String(first); sel.onchange = () => selectCape(+sel.value);
+  if (capes.length) selectCape(first);
+  cursor = firstHeld;
+  $("recNote").textContent = "Gravado: " + frames.length + " quadros, " + frames[frames.length - 1].t.toFixed(1) + " s, tier " + REC.tier + ", inclinação " + REC.tilt + "°. A pose fica travada a partir do quadro " + firstHeld + "."
+    + (badFrames ? " Em " + badFrames + " quadros a capa do jogo pulou para a frente do peito (os ossos não se mexeram); esses quadros mostram o anterior." : "");
+} else {
+  $("badge").textContent = "falta o personagem ou a gravação";
+}
+syncInputs();
+(async () => {
+  try {
+    if (window.claude && claude.use) {
+      const timer = setTimeout(() => status("O banco de dados não respondeu; dá para mexer, mas salvar pode falhar."), 10000);
+      db = await claude.use("db");
+      clearTimeout(timer);
+      if (!db) status("Salvar não está disponível nesta visualização.");
+      else await load();
+    } else status("Abra no Claude para poder salvar.");
+  } catch (e) { status("Erro ao conectar: " + (e && e.message || e)); }
+})();
+let last = performance.now();
+function tick(now) {
+  requestAnimationFrame(tick);
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  clock += dt;
+  if (frames.length) {
+    if (!paused) {
+      // the recording keeps every other game frame: play it at its own times
+      const lo = mode === "hold" ? firstHeld : 0, hi = frames.length - 1;
+      const span = Math.max(0.2, frames[hi].t - frames[lo].t);
+      if (playT < frames[lo].t || playT < frames[Math.floor(cursor)].t - 0.001) playT = frames[Math.max(lo, Math.floor(cursor))].t;
+      playT += dt;
+      if (playT > frames[hi].t) playT = frames[lo].t + ((playT - frames[lo].t) % span);
+      let j = lo; while (j < hi && frames[j + 1].t <= playT) j++;
+      cursor = j;
+      $("scrub").value = String(j);
+    }
+    const f = Math.floor(cursor);
+    $("scrubOut").textContent = String(f);
+    poseFrame(f, clock); skinBody(); skinCape(); if (exactCape) showRecordedCape(f); drawGhost(f);
+    badge();
+  }
+  orbit.update(); renderer.render(scene, camera);
+}
+resize(); requestAnimationFrame(tick);
+</script>
