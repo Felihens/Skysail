@@ -7,7 +7,7 @@ Mod para Valheim (BepInEx, client-side): plane com qualquer capa. Aperte Pular n
 For players, see [package/README.md](package/README.md). That file is also the Thunderstore page.
 Para jogadores, veja [package/README.md](package/README.md).
 
-Download: [Thunderstore](https://thunderstore.io/c/valheim/p/DJAventuras/Skysail/) · [GitHub Releases](https://github.com/Felihens/Skysail/releases)
+Download: [Thunderstore](https://thunderstore.io/c/valheim/p/DJAventuras/Skysail/) · [Nexus Mods](https://www.nexusmods.com/valheim/mods/4976) · [GitHub Releases](https://github.com/Felihens/Skysail/releases)
 
 Sister mods / mods irmãos: [Beastkeeper](https://github.com/Felihens/Beastkeeper), [Warband](https://github.com/Felihens/Warband), [Sea Legs](https://github.com/Felihens/SeaLegs), [Gather Tweaks](https://github.com/Felihens/GatherTweaks), [Auto Walk Around](https://github.com/Felihens/AutoWalkAround), [Recipe Book](https://github.com/Felihens/RecipeBook).
 
